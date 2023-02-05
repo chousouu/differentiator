@@ -211,7 +211,7 @@ static int DiffTree(char *buffer, Node *node, int buffer_size)
 
 Tree *GetTree(char *buffer, int buffer_size)
 {
-    Tree *DTree = CreateTree(0);
+    Tree *DTree = CreateTree(66);
 
     if(DiffTree(buffer, DTree->root, buffer_size))
     {
@@ -256,12 +256,12 @@ static void DumpNodes(FILE *graph, Node *node, int mode)
         }
         if(node->left != NULL)
         {
-            fprintf(graph, " \"node%d_%lf\" -> \"node%d_%lf\" [color = \"green\"]\n", 
+            fprintf(graph, " \"node%d_%.2lf\" -> \"node%d_%.2lf\" [color = \"green\"]\n", 
             node->type, node->data, node->left->type, node->left->data);
         }
         if(node->right != NULL)
         {
-            fprintf(graph, " \"node%d_%lf\" -> \"node%d_%lf\" [color = \"red\"]\n", 
+            fprintf(graph, " \"node%d_%.2lf\" -> \"node%d_%.2lf\" [color = \"red\"]\n", 
             node->type, node->data, node->right->type, node->right->data);
         }
         DumpNodes(graph, node->left, mode);
