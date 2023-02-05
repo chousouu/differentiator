@@ -11,10 +11,13 @@
 
 #define DEB(...) printf(__VA_ARGS__)
 
-enum graphviz
+#define PRINT_UNARY(PRINT_X, X) else if(node->data == X) { fprintf(graph,"label = \" %s\"\n", #PRINT_X);}
+
+enum UNARY
 {
-    CREATE_NODE = 0,
-    LINK_NODE   = 1,
+    UNARY_COS = 'soc',
+    UNARY_SIN = 'nis',
+    UNARY_LN  = 'nl',
 };
 
 enum ERRORS
@@ -26,6 +29,7 @@ enum ERRORS
     ERROR_LR_EXIST = 0X004,
     ERROR_BRACKETS = 0x005,
     ERROR_SCANF    = 0x006,
+    ERROR_UNARY    = 0x007,
 
 };
 

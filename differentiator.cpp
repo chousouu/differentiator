@@ -1,6 +1,10 @@
 #include "differentiator.h"
 #include "tree.h"
 
+#define N_UNARY_FUNCS 3
+int UNARY_FUNCS[] = {'soc', 'nis', 'nl'};
+
+
 int CountSymbols(const char *filename)
 {
     struct stat buff = {};
@@ -28,34 +32,32 @@ char *ReadToBuffer(const char *filename, int size)
     return buffer;
 }
 
-static long unsigned HashCounter(void *data, int len)
+static long unsigned HashUnary(void *data, int len)
 {
-    unsigned long a = 0 , b = 0, c = 0;
-    unsigned int fool      = 0xAF00L;
-    unsigned int lightning = 1988  ;
-
     char *datawalker = (char*)data;
     int hash_counter = 0;
-    while (len > 4)
-    {
-        a += fool++;
-        b += fool++;
-        c += fool++;
 
-        c = a << 2;
-        b = a << 3;
-        a = a << 1;
-        len -= 4;
+    int two_five_six_n = 1;
+    for(int i = 0; i < len; i++)
+    {
+        hash_counter += (datawalker[i] * (two_five_six_n));
+        two_five_six_n *= 256; 
+    }
+ 
+    return hash_counter;
+}
+
+static int isUnary(int HASHED_UNARY)
+{    
+    for(int i = 0; i < N_UNARY_FUNCS; i++)
+    {
+        if(HASHED_UNARY == UNARY_FUNCS[i])
+        {
+            return i;
+        }
     }
 
-    c += datawalker[2] << 24;
-    b += datawalker[1] << 16;
-    a += datawalker[0] << 8 ; 
-
-    hash_counter = a * (fool) + b * (fool + lightning) + c * (fool + 311);
-
-    hash_counter += (hash_counter << 3) | (hash_counter >> 2);
-    return hash_counter;
+    return -1;
 }
 
 static int ProcessAlnum(char *target, Node **node, int *iterator)
@@ -81,8 +83,15 @@ static int ProcessAlnum(char *target, Node **node, int *iterator)
         }
         else // length > 1 ===> cos/ln/....
         {
+            int hashed_unary = HashUnary(target, word_length);
+            if(isUnary(hashed_unary) < 0)
+            {
+                printf("non existing unary func\n");
+                return ERROR_UNARY;
+            }
+            
             (*node)->type = TYPE_UNARY;
-            (*node)->data = HashCounter(target, word_length);
+            (*node)->data = hashed_unary;
             (*iterator) += word_length - 1;
         }
     }
@@ -221,52 +230,74 @@ Tree *GetTree(char *buffer, int buffer_size)
         return NULL;
     }
 
+    if(DTree->root->right == NULL)  
+    { // with no right tree exists additional node (root)
+        Node *tmp = DTree->root;
+        DTree->root = DTree->root->left;
+
+        free(tmp);
+    }
+
     return DTree;
 }
 
-static void DumpNodes(FILE *graph, Node *node, int mode)
+static void DumpCreateNodes(FILE *graph, Node *node)
 {
-    if(mode == CREATE_NODE)
+    if(node == NULL)
     {
-        if(node == NULL)
-        {
-            return;
-        }
-
-        fprintf(graph, " \"node%d_%.2lf\" [\n", node->type, node->data);  
-            if(node->type == TYPE_CONST)
-            {
-                fprintf(graph,"label = \"%.2lf\" \n", node->data);
-            }
-            else 
-            {
-                fprintf(graph,"label = \"%c\" \n", (int)node->data);
-            }
-        fprintf(graph, "shape = \"record\"\n"
-                       "];\n");
-
-        DumpNodes(graph, node->left, mode);
-        DumpNodes(graph, node->right, mode);
+        return;
     }
-    else //if mode == LINK_NODE
+    if(!(node->data == 0 && node->type == 0))
     {
-        if(node == NULL)
+    
+    fprintf(graph, " \"node%p\" [\n", node);  
+        if(node->type == TYPE_CONST)
         {
-            return;
+            fprintf(graph,"label = \"%.2lf\" \n", node->data);
         }
-        if(node->left != NULL)
+        else if (node->type == TYPE_UNARY)
         {
-            fprintf(graph, " \"node%d_%.2lf\" -> \"node%d_%.2lf\" [color = \"green\"]\n", 
-            node->type, node->data, node->left->type, node->left->data);
-        }
-        if(node->right != NULL)
+            if(node->data == 'nis')
+            {
+                fprintf(graph,"label = \"sin\" \n");
+            }
+            PRINT_UNARY(cos, 'soc')
+            PRINT_UNARY(ln, 'nl')
+        } 
+        else 
         {
-            fprintf(graph, " \"node%d_%.2lf\" -> \"node%d_%.2lf\" [color = \"red\"]\n", 
-            node->type, node->data, node->right->type, node->right->data);
+            fprintf(graph,"label = \"%c\" \n", (int)node->data);
         }
-        DumpNodes(graph, node->left, mode);
-        DumpNodes(graph, node->right, mode);
+    fprintf(graph, "shape = \"record\"\n"
+                    "];\n");
     }
+    DumpCreateNodes(graph, node->left);
+    DumpCreateNodes(graph, node->right);
+
+    return;
+}
+
+
+static void DumpLinkNodes(FILE *graph, Node *node)
+{
+    if(node == NULL)
+    {
+        return;
+    }
+    if (node->left != NULL)
+    {
+        fprintf(graph, " \"node%p\" -> \"node%p\" [color = \"green\"]\n", 
+        node, node->left);
+    }
+    if(node->right != NULL)
+    {
+        fprintf(graph, " \"node%p\" -> \"node%p\" [color = \"red\"]\n", 
+        node, node->right);
+    }
+    
+
+    DumpLinkNodes(graph, node->left);
+    DumpLinkNodes(graph, node->right);
 }
 
 //TODO: add system calls for opening graph dump
@@ -291,12 +322,12 @@ void GraphDump(Node *root)
                 "edge [];\n"
             );
 
-    DumpNodes(graph, root, CREATE_NODE);
-    DumpNodes(graph, root, LINK_NODE);
+    DumpCreateNodes(graph, root);
+    DumpLinkNodes(graph, root);
 
     fprintf(graph, "}");
 
-   fclose(graph);
+    fclose(graph);
 
     system("dot graph.txt -T png -o dump.png");
 }
